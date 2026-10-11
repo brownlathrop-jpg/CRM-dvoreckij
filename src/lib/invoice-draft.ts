@@ -41,8 +41,13 @@ function load(): InvoiceDraft {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return empty();
-    const parsed = JSON.parse(raw) as Partial<InvoiceDraft>;
-    return { ...empty(), ...parsed, items: Array.isArray(parsed.items) ? parsed.items : [] };
+    const parsed = JSON.parse(raw) as Partial<InvoiceDraft> & { savedOn?: string };
+    const today = new Date().toISOString().slice(0, 10);
+    // Черновик со вчерашнего дня и раньше: дату ставим сегодняшнюю,
+    // иначе новая заявка молча получает старую дату и «теряется» в журнале.
+    const date = parsed.savedOn === today && parsed.date ? parsed.date : today;
+    const { savedOn: _s, ...rest } = parsed;
+    return { ...empty(), ...rest, date, items: Array.isArray(parsed.items) ? parsed.items : [] };
   } catch {
     return empty();
   }
@@ -50,7 +55,9 @@ function load(): InvoiceDraft {
 
 function persist() {
   if (typeof window === "undefined") return;
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ ...state, savedOn: new Date().toISOString().slice(0, 10) }));
+  } catch {}
 }
 
 export const invoiceDraft = {
