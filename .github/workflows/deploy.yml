@@ -26,10 +26,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Та же сборка, что и при ручном деплое (scripts/deploy.sh)
+      # Отдельный конфиг: на GitHub обычная сборка кладёт файлы в .output, а серверу нужен dist
       - name: Build
         run: |
-          bun run build
+          bunx vite build --config vite.config.standalone.ts
           test -f dist/server/index.mjs
           echo "$GITHUB_SHA" > dist/client/version.txt
 
