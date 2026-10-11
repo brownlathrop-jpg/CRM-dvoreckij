@@ -1315,6 +1315,7 @@ async function importCashDocs(
       return {
         user_id: userId,
         workspace_id: wsId,
+        organization_id: resolveOrgId(o),
         ext_1c_id: o.ext,
         number,
         kind: g.kind,
