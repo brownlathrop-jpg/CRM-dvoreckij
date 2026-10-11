@@ -1096,7 +1096,7 @@ async function importShipments(
       // удаляем порциями (IN-список ограничен)
       for (let i = 0; i < invoiceIds.length; i += 200) {
         const part = invoiceIds.slice(i, i + 200);
-        const { error } = await (db as any).from("invoice_items").delete().in("invoice_id", part);
+        const { error } = await (db as any).from("invoice_items").delete().in("invoice_id", part).eq("workspace_id", wsId);
         if (error) throw new Error(`invoice_items delete: ${error.message}`);
       }
     }
@@ -1110,7 +1110,7 @@ async function importShipments(
       const rows = docItemRows(o, productsMap, productNameById);
       for (const r of rows) {
         if (r.product_id) withProduct += 1;
-        itemsBuf.push({ invoice_id: invId, ...r });
+        itemsBuf.push({ invoice_id: invId, workspace_id: wsId, ...r });
       }
     }
     for (let i = 0; i < itemsBuf.length; i += 500) {
