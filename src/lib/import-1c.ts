@@ -443,6 +443,7 @@ async function makeStatusResolver(wsId: string, userId: string): Promise<StatusR
       { name: "Предоплата", color: "#eab308", sort_order: 1 },
       { name: "Оплачен", color: "#3b82f6", sort_order: 2 },
       { name: "Выполнен", color: "#22c55e", sort_order: 3 },
+      { name: "Отменён", color: "#ef4444", sort_order: 4 },
     ].map(s => ({ ...s, user_id: userId, workspace_id: wsId })));
     list = await load();
   }
