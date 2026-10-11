@@ -1,6 +1,13 @@
 // Тарифы: что включено, сколько пользователей, цена, дополнительные опции.
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Check, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { db } from "@/integrations/db";
+import { adminSetPlan } from "@/lib/billing.functions";
+import type { PlanId } from "@/lib/plans";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBilling } from "@/hooks/use-billing";
@@ -39,6 +46,28 @@ const money = (n: number) => `${n.toLocaleString("ru-RU")} ₽`;
 
 function TariffsPage() {
   const { access, usage } = useBilling();
+  const qc = useQueryClient();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [saving, setSaving] = useState<PlanId | null>(null);
+  useEffect(() => {
+    db.auth.getUser().then(({ data }) => setIsAdmin(!!(data.user?.user_metadata as any)?.is_admin));
+  }, []);
+
+  const switchPlan = async (p: PlanId) => {
+    if (!access) return;
+    setSaving(p);
+    try {
+      const res: any = await adminSetPlan({ data: { workspaceId: access.workspaceId, plan: p } });
+      if (res?.error) throw new Error(res.error.message);
+      toast.success(`Тариф «${PLANS[p].label}» включён`);
+      qc.invalidateQueries({ queryKey: ["billing-mine"] });
+      qc.invalidateQueries({ queryKey: ["admin-billing"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Не удалось сменить тариф");
+    } finally {
+      setSaving(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
