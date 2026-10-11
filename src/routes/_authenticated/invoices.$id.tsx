@@ -1149,7 +1149,7 @@ function InvoiceView() {
 
       {/* Print layout (hidden on screen) */}
       {(printMode === "standard" || printMode === "invoice") && (
-      <div className="invoice-print hidden print:block bg-white text-black mx-auto" style={{ maxWidth: 900 }}>
+      <div className="invoice-print invoice-print-compact hidden print:block bg-print-paper text-print-ink mx-auto">
         <PrintHeader org={myOrg as any} />
         {printMode === "invoice" && orgAsParty && (
           <>
@@ -1201,17 +1201,25 @@ function InvoiceView() {
             </>
           : "Частное лицо"}</p>
 
-        <table className="w-full border-collapse text-sm">
+        <table className="invoice-print-items w-full border-collapse">
+          <colgroup>
+            <col className="print-col-number" />
+            <col />
+            <col className="print-col-unit" />
+            <col className="print-col-quantity" />
+            <col className="print-col-money" />
+            {totalDiscount > 0 && <col className="print-col-discount" />}
+            <col className="print-col-money" />
+          </colgroup>
           <thead>
-            <tr style={{ background: "#f3f4f6" }}>
-              <th className="border border-black px-2 py-1 text-center w-10">№</th>
-              <th className="border border-black px-2 py-1 text-center">Наименование товара, работ, услуг</th>
-              <th className="border border-black px-2 py-1 text-center w-20">Ед. изм.</th>
-              <th className="border border-black px-2 py-1 text-center w-20">Кол-во</th>
-              <th className="border border-black px-2 py-1 text-center w-28">Цена</th>
-              {totalDiscount > 0 && <th className="border border-black px-2 py-1 text-center w-24">Скидка</th>}
-              {totalDiscount > 0 && <th className="border border-black px-2 py-1 text-center w-28">Сумма без скидки</th>}
-              <th className="border border-black px-2 py-1 text-center w-32">Сумма</th>
+            <tr>
+              <th>№</th>
+              <th className="text-left">Наименование</th>
+              <th>Ед.</th>
+              <th>Кол-во</th>
+              <th>Цена</th>
+              {totalDiscount > 0 && <th>Скидка</th>}
+              <th>Сумма</th>
             </tr>
           </thead>
           <tbody>
@@ -1220,7 +1228,7 @@ function InvoiceView() {
               const services = items.filter(it => it.kind === "service");
               const goodsTotal = goods.reduce((s, i) => s + lineVat(i).gross, 0);
               const servicesTotal = services.reduce((s, i) => s + lineVat(i).gross, 0);
-              const cols = totalDiscount > 0 ? 8 : 6;
+              const cols = totalDiscount > 0 ? 7 : 6;
               const hasBoth = goods.length > 0 && services.length > 0;
               let n = 0;
               const renderRow = (it: Item, i: number) => {
@@ -1237,9 +1245,6 @@ function InvoiceView() {
                       <td className="border border-black px-2 py-1 text-right">
                         {lineDiscount(it) > 0 ? nfmt.format(lineDiscount(it)) : "—"}
                       </td>
-                    )}
-                    {totalDiscount > 0 && (
-                      <td className="border border-black px-2 py-1 text-right">{nfmt.format(lineGross(it))}</td>
                     )}
                     <td className="border border-black px-2 py-1 text-right">{nfmt.format(lineVat(it).gross)}</td>
                   </tr>

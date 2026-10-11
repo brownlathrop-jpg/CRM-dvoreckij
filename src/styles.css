@@ -43,9 +43,17 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-print-paper: var(--print-paper);
+  --color-print-ink: var(--print-ink);
+  --color-print-muted: var(--print-muted);
+  --color-print-rule: var(--print-rule);
 }
 
 :root {
+  --print-paper: oklch(1 0 0);
+  --print-ink: oklch(0 0 0);
+  --print-muted: oklch(0.95 0 0);
+  --print-rule: oklch(0.45 0 0);
   --radius: 0.5rem;
   --background: oklch(0.985 0.003 247);
   --foreground: oklch(0.18 0.04 260);
@@ -161,3 +169,34 @@
   background: var(--color-background);
 }
 .xls-table .xls-cell.text-right { text-align: right; }
+
+/* Orders and invoices: reserve the page width for product names, not empty cells. */
+.invoice-print-compact {
+  max-width: 190mm;
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+  line-height: 1.25;
+}
+.invoice-print-compact > h1 { font-size: 14pt; margin: 0 0 4mm; }
+.invoice-print-compact > p { font-size: 10pt; margin-top: 1.5mm; margin-bottom: 2mm; }
+.invoice-print-compact > div:first-child { margin-bottom: 3mm; padding-bottom: 2mm; }
+.invoice-print-compact > div:last-child { margin-top: 6mm; break-inside: avoid; }
+.invoice-print-compact > div:last-child > .font-bold { margin-bottom: 4mm; }
+.invoice-print-items { table-layout: fixed; font-size: 9pt; line-height: 1.25; }
+.invoice-print-items .print-col-number { width: 7mm; }
+.invoice-print-items .print-col-unit { width: 9mm; }
+.invoice-print-items .print-col-quantity { width: 13mm; }
+.invoice-print-items .print-col-money { width: 25mm; }
+.invoice-print-items .print-col-discount { width: 22mm; }
+.invoice-print-items th,
+.invoice-print-items td {
+  padding: 1.2mm 1.5mm;
+  border: 0.5pt solid var(--print-rule);
+  vertical-align: middle;
+}
+.invoice-print-items th { background: var(--print-muted); font-weight: 600; }
+.invoice-print-items td:not(:nth-child(2)) { white-space: nowrap; }
+.invoice-print-items td:nth-child(2) { overflow-wrap: anywhere; }
+.invoice-print-items td[colspan] { white-space: normal; }
+.invoice-print-items thead { display: table-header-group; }
+.invoice-print-items tr { break-inside: avoid; page-break-inside: avoid; }
