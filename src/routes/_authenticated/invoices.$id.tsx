@@ -402,13 +402,7 @@ function InvoiceView() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // auto-assign default status (first by sort) if invoice has none
-  useEffect(() => {
-    if (inv && !inv.status_id && statuses.length > 0) {
-      setStatusId.mutate(statuses[0].id);
-    }
-     
-  }, [inv?.id, statuses.length]);
+  // Статус не назначается автоматически при открытии — иначе затираются статусы из импорта.
 
   const createShipment = useMutation({
     mutationFn: async () => {
