@@ -692,9 +692,6 @@ export async function importAll(
     const partnersMap = await loadExtMap("partners", wsId);
     const banksMap = await loadExtMap("banks", wsId);
     // organization: возьмём главную из workspace
-    const { data: org } = await (db as any).from("organizations")
-      .select("id").eq("workspace_id", wsId).order("is_primary", { ascending: false }).limit(1).maybeSingle();
-    const orgId = org?.id ?? null;
 
     const rows: any[] = [];
     for (const o of src) {
@@ -706,8 +703,8 @@ export async function importAll(
       const partnerId = partnersMap.get(ownerExt);
       if (partnerId) {
         rows.push({ ...base, ext_1c_id: o.ext, owner_type: "partner", partner_id: partnerId, bank_id: bankId, account_number: account, currency: "RUB", is_primary: false });
-      } else if (orgId) {
-        rows.push({ ...base, ext_1c_id: o.ext, owner_type: "organization", organization_id: orgId, bank_id: bankId, account_number: account, currency: "RUB", is_primary: false });
+      } else if (orgIdByExt.get(ownerExt) ?? defaultOrgId) {
+        rows.push({ ...base, ext_1c_id: o.ext, owner_type: "organization", organization_id: orgIdByExt.get(ownerExt) ?? defaultOrgId, bank_id: bankId, account_number: account, currency: "RUB", is_primary: false });
       }
     }
     await batchUpsert("bank_accounts", rows);
@@ -1195,6 +1192,7 @@ async function importShipments(
         issue_date: parseDate1C(dateRaw),
         partner_id: partnerId,
         status_id: statusIds.get(o) ?? null,
+        organization_id: resolveOrgId(o),
         // Накладные приходят черновиками — склад двигается при проведении.
         status: g.doc_type === "order" && DOC_STATUSES.includes(readProp(o, ["СтатусCRM"]) ?? "") ? readProp(o, ["СтатусCRM"]) : "draft",
         warehouse_id: (() => { const w = readRef(o, ["Склад"]); return w ? (warehousesMap.get(w) ?? null) : null; })(),
