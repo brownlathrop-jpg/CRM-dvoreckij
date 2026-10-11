@@ -107,6 +107,7 @@ export function PaymentsCard({
       return { org: orgResult.data as (PrintBrand & { okpo?: string | null }) | null, partnerName: partnerResult.data?.name as string | undefined };
     },
   });
+  const { data: printDetails } = printDetailsQuery;
 
   // Оплата в сторону документа увеличивает оплаченное, обратная (возврат денег) — уменьшает.
   const paid = useMemo(
