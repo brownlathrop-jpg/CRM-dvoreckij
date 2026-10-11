@@ -1,7 +1,15 @@
-﻿name: Deploy to VPS
+name: Deploy to VPS
 
 on:
   workflow_dispatch:
+
+# CRM живёт только на 178.212.13.144 (crm.skladnow.ru), пользователь crmdeploy.
+# Адрес и пользователь зашиты здесь намеренно: секреты VPS_HOST/VPS_USER
+# раньше указывали на сервер другого проекта.
+env:
+  CRM_HOST: 178.212.13.144
+  CRM_USER: crmdeploy
+  APP_DIR: /home/crmadmin/htdocs/crm.skladnow.ru
 
 jobs:
   deploy:
@@ -18,14 +26,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build (standalone)
-        run: bunx vite build --config vite.config.standalone.ts
-
-      - name: Show output
+      # Та же сборка, что и при ручном деплое (scripts/deploy.sh)
+      - name: Build
         run: |
-          ls -la
-          ls -la dist || echo "dist missing"
-          ls -la dist/server || echo "dist/server missing"
+          bun run build
+          test -f dist/server/index.mjs
+          echo "$GITHUB_SHA" > dist/client/version.txt
 
       - name: Prepare archive
         run: tar -czf deploy.tar.gz dist selfhost sql scripts
@@ -33,8 +39,8 @@ jobs:
       - name: Copy to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
+          host: ${{ env.CRM_HOST }}
+          username: ${{ env.CRM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: deploy.tar.gz
           target: /tmp/
@@ -42,28 +48,36 @@ jobs:
       - name: Deploy on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
+          host: ${{ env.CRM_HOST }}
+          username: ${{ env.CRM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: APP_DIR,GITHUB_SHA
           script: |
             set -e
-            APP=/home/crmadmin/htdocs/crm.skladnow.ru
-            cd "$APP"
+            cd "$APP_DIR"
             STAMP=$(date +%s)
-            mv dist "dist.prev-$STAMP"
+            [ -d dist ] && mv dist "dist.prev-$STAMP"
+            rm -rf selfhost sql scripts
             tar -xzf /tmp/deploy.tar.gz
             rm -f /tmp/deploy.tar.gz
             if [ -r ./.env ]; then set -a; . ./.env; set +a; fi
             node scripts/migrate.mjs
             pm2 restart ecosystem.config.cjs && pm2 save
-            sleep 3
-            if ! curl -sf -o /dev/null http://127.0.0.1:3001; then
-              echo "Health check failed on :3001, rolling back"
+            sleep 4
+            GOT=$(curl -sf http://127.0.0.1:3001/version.txt || true)
+            if [ "$GOT" != "$GITHUB_SHA" ]; then
+              echo "Сайт отдаёт версию '$GOT', ожидалась '$GITHUB_SHA' — откат"
               rm -rf dist
               mv "dist.prev-$STAMP" dist
               pm2 restart ecosystem.config.cjs
               exit 1
             fi
-            # Храним только 2 последние копии для отката
-            ls -1dt dist.prev-* 2>/dev/null | tail -n +3 | xargs -r rm -rf
-            echo "Deploy complete, health check OK on :3001"
+            ls -1dt dist.prev-* 2>/dev/null | tail -n +3 | xargs -r rm -rf || true
+            echo "Деплой готов, версия $GITHUB_SHA"
+
+      - name: Check public site
+        run: |
+          sleep 2
+          GOT=$(curl -sk --resolve crm.skladnow.ru:443:$CRM_HOST https://crm.skladnow.ru/version.txt)
+          echo "crm.skladnow.ru отдаёт версию: $GOT"
+          test "$GOT" = "$GITHUB_SHA"
