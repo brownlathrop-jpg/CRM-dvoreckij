@@ -93,7 +93,7 @@ export function PaymentsCard({
     },
   });
 
-  const { data: printDetails } = useQuery({
+  const printDetailsQuery = useQuery({
     queryKey: ["payment-print-details", workspaceId, partnerId, orgId],
     enabled: !!workspaceId,
     queryFn: async () => {
@@ -115,10 +115,14 @@ export function PaymentsCard({
   );
   const left = Math.max(0, Number(total || 0) - paid);
 
-  const triggerPkoPrint = () => {
+  const triggerPkoPrint = async () => {
     document.body.classList.add("payment-pko-mode");
     const cleanup = () => document.body.classList.remove("payment-pko-mode");
     window.addEventListener("afterprint", cleanup, { once: true });
+    // Ждём реквизиты организации, иначе ПКО печатается без шапки.
+    if (!printDetails) {
+      try { await printDetailsQuery.refetch(); } catch { /* печатаем как есть */ }
+    }
     setTimeout(() => window.print(), 120);
   };
 
