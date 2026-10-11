@@ -422,6 +422,52 @@ function mergeObjectsByExt(src: Obj[]): Obj[] {
 const PARTNER_KINDS = ["customer", "supplier", "employee", "other"];
 const DOC_STATUSES = ["draft", "sent", "paid", "posted", "cancelled"];
 
+// Пользовательские статусы документов (справочник «Статусы документов»).
+type StatusResolver = (o: Obj) => Promise<string | null>;
+async function makeStatusResolver(wsId: string, userId: string): Promise<StatusResolver> {
+  const load = async () =>
+    ((await (db as any).from("invoice_statuses").select("id,name,sort_order").eq("workspace_id", wsId).order("sort_order")).data ?? []) as { id: string; name: string; sort_order: number }[];
+  let list = await load();
+  if (!list.length) {
+    await (db as any).from("invoice_statuses").insert([
+      { name: "Новый", color: "#64748b", sort_order: 0 },
+      { name: "Предоплата", color: "#eab308", sort_order: 1 },
+      { name: "Оплачен", color: "#3b82f6", sort_order: 2 },
+      { name: "Выполнен", color: "#22c55e", sort_order: 3 },
+    ].map(s => ({ ...s, user_id: userId, workspace_id: wsId })));
+    list = await load();
+  }
+  const byName = new Map(list.map(s => [s.name.trim().toLowerCase(), s.id]));
+  const find = (...names: string[]) => { for (const n of names) { const id = byName.get(n.toLowerCase()); if (id) return id; } return null; };
+  const def = list[0]?.id ?? null;
+  let nextSort = (list[list.length - 1]?.sort_order ?? 0) + 1;
+  const humanize = (s: string) => s.replace(/^.*\./, "").replace(/([а-яё])([А-ЯЁ])/g, "$1 $2").trim();
+
+  return async (o: Obj) => {
+    const raw = readProp(o, ["СтатусЗаказа", "СостояниеЗаказа", "СтатусДокумента", "Статус", "Состояние", "СтатусCRM"]);
+    if (raw && !hasUuidLike(raw) && !DOC_STATUSES.includes(raw)) {
+      const name = humanize(raw);
+      const low = name.toLowerCase();
+      let id = byName.get(low) ?? null;
+      if (!id) {
+        if (/закрыт|выполн|отгруж|завершен|исполн/.test(low)) id = find("Выполнен");
+        else if (/оплачен/.test(low)) id = find("Оплачен");
+        else if (/предоплат|к оплате|ожидает оплат/.test(low)) id = find("Предоплата");
+      }
+      if (!id && name) {
+        const { data } = await (db as any).from("invoice_statuses")
+          .insert({ name: name[0].toUpperCase() + name.slice(1), color: "#8b5cf6", sort_order: nextSort++, user_id: userId, workspace_id: wsId })
+          .select("id").single();
+        if (data?.id) { id = data.id; byName.set(low, data.id); }
+      }
+      if (id) return id;
+    }
+    if (readBool(o, ["Оплачен"])) return find("Оплачен") ?? def;
+    if (readBool(o, ["Закрыт", "Выполнен"])) return find("Выполнен") ?? def;
+    return def;
+  };
+}
+
 export async function importAll(
   xml: string,
   wsId: string,
