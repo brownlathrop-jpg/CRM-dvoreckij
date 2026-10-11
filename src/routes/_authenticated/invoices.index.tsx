@@ -112,7 +112,7 @@ function InvoicesPage() {
       return String(i.number ?? "").toLowerCase().includes(q)
         || String(i.partner?.name ?? "").toLowerCase().includes(q);
     });
-  }, [invoices, search, docType, kind, statusName]);
+  }, [invoices, search, docType, kind, statusName, orgFilter]);
 
   const total = useMemo(() => filtered.reduce((s, i) => s + docAmount(i), 0), [filtered]);
 

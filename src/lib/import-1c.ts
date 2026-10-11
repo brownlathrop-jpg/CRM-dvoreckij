@@ -704,8 +704,10 @@ export async function importAll(
       const partnerId = partnersMap.get(ownerExt);
       if (partnerId) {
         rows.push({ ...base, ext_1c_id: o.ext, owner_type: "partner", partner_id: partnerId, bank_id: bankId, account_number: account, currency: "RUB", is_primary: false });
-      } else if (orgIdByExt.get(ownerExt) ?? defaultOrgId) {
-        rows.push({ ...base, ext_1c_id: o.ext, owner_type: "organization", organization_id: orgIdByExt.get(ownerExt) ?? defaultOrgId, bank_id: bankId, account_number: account, currency: "RUB", is_primary: false });
+      } else if (orgIdByExt.get(ownerExt)) {
+        // Только счета, владелец которых — именно организация из выгрузки.
+        // Раньше «ничейные» счета контрагентов падали в главную организацию.
+        rows.push({ ...base, ext_1c_id: o.ext, owner_type: "organization", organization_id: orgIdByExt.get(ownerExt), bank_id: bankId, account_number: account, currency: "RUB", is_primary: false });
       }
     }
     await batchUpsert("bank_accounts", rows);

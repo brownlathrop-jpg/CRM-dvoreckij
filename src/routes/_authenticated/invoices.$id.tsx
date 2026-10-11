@@ -1189,6 +1189,8 @@ function InvoiceView() {
           <p className="mb-2 text-sm"><span className="font-bold">Поставщик:</span> {supplierLine.name}
             {supplierLine.inn ? `, ИНН ${supplierLine.inn}` : ""}
             {supplierLine.kpp ? `, КПП ${supplierLine.kpp}` : ""}
+            {supplierLine.address ? `, ${supplierLine.address}` : ""}
+            {supplierLine.phone ? `, тел. ${supplierLine.phone}` : ""}
           </p>
         )}
         <p className="mb-4 text-sm"><span className="font-bold">Покупатель:</span> {buyerLine
