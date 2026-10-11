@@ -427,7 +427,7 @@ function InvoiceView() {
       if (error) throw error;
       // Copy items
       const rows = items.map(it => ({
-        invoice_id: ship.id, product_id: it.product_id, name: it.name,
+        invoice_id: ship.id, workspace_id: inv!.workspace_id ?? wsId, product_id: it.product_id, name: it.name,
         quantity: it.quantity, price: it.price, sum: it.quantity * it.price,
         kind: it.kind ?? "product",
       }));
@@ -532,7 +532,7 @@ function InvoiceView() {
       }).select("id").single();
       if (error) throw error;
       const rows = items.map(it => ({
-        invoice_id: doc.id, product_id: it.product_id, name: it.name,
+        invoice_id: doc.id, workspace_id: inv!.workspace_id ?? wsId, product_id: it.product_id, name: it.name,
         quantity: it.quantity, price: it.price,
         sum: netSum(it.quantity, it.price, it.discount_kind, it.discount_value),
         discount_kind: it.discount_kind ?? "percent",
@@ -616,7 +616,7 @@ function InvoiceView() {
 
           {editable && <Button onClick={() => save.mutate()} disabled={save.isPending}><Save className="h-4 w-4 mr-1" /> Сохранить</Button>}
           {isShipment && inv.status === "draft" && <Button variant="outline" onClick={() => setStatus.mutate("posted")}><CheckCircle2 className="h-4 w-4 mr-1" /> Провести</Button>}
-          {isShipment && kind === "outgoing" && inv.status !== "cancelled" && (
+          {(isShipment || isOrder) && kind === "outgoing" && inv.status !== "cancelled" && (
             <KktReceiptButton
               wsId={wsId}
               orgId={orgId || inv.organization_id || null}
