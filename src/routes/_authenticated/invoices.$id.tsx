@@ -402,13 +402,7 @@ function InvoiceView() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // auto-assign default status (first by sort) if invoice has none
-  useEffect(() => {
-    if (inv && !inv.status_id && statuses.length > 0) {
-      setStatusId.mutate(statuses[0].id);
-    }
-     
-  }, [inv?.id, statuses.length]);
+  // Статус не назначается автоматически при открытии — иначе затираются статусы из импорта.
 
   const createShipment = useMutation({
     mutationFn: async () => {
@@ -1193,15 +1187,15 @@ function InvoiceView() {
         <h1 className="text-center text-xl font-bold mb-5">{title}</h1>
         {supplierLine && (
           <p className="mb-2 text-sm"><span className="font-bold">Поставщик:</span> {supplierLine.name}
-            {printMode === "invoice" && supplierLine.inn ? `, ИНН ${supplierLine.inn}` : ""}
-            {printMode === "invoice" && supplierLine.kpp ? `, КПП ${supplierLine.kpp}` : ""}
+            {supplierLine.inn ? `, ИНН ${supplierLine.inn}` : ""}
+            {supplierLine.kpp ? `, КПП ${supplierLine.kpp}` : ""}
           </p>
         )}
         <p className="mb-4 text-sm"><span className="font-bold">Покупатель:</span> {buyerLine
           ? <>
               {buyerLine.name}
-              {printMode === "invoice" && buyerLine.inn ? `, ИНН ${buyerLine.inn}` : ""}
-              {printMode === "invoice" && buyerLine.kpp ? `, КПП ${buyerLine.kpp}` : ""}
+              {buyerLine.inn ? `, ИНН ${buyerLine.inn}` : ""}
+              {buyerLine.kpp ? `, КПП ${buyerLine.kpp}` : ""}
             </>
           : "Частное лицо"}</p>
 
