@@ -107,7 +107,8 @@ function InvoiceView() {
     queryFn: async () => (await (db as any).from("warehouses").select("id,name,is_default").eq("workspace_id", wsId).order("is_default", { ascending: false }).order("name")).data as { id: string; name: string; is_default: boolean }[] ?? [],
   });
   // Юрлица базы; документ привязан к организации, от неё печать и чек
-  const { data: orgs = [] } = useOrganizations(wsId);
+  const orgsQuery = useOrganizations(wsId);
+  const orgs = orgsQuery.data ?? [];
   const [orgId, setOrgId] = useState<string>("");
   const myOrg = pickOrg(orgs, orgId || null);
   const { data: statuses = [] } = useQuery({
