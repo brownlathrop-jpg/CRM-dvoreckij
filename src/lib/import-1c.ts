@@ -1093,22 +1093,29 @@ async function importShipments(
     const warehousesMap = await loadExtMap("warehouses", wsId);
 
     // 1) Шапки: upsert по (user_id, ext_1c_id)
+    const resolveStatus = await makeStatusResolver(wsId, userId);
+    const statusIds = new Map<Obj, string | null>();
+    for (const o of src) statusIds.set(o, await resolveStatus(o));
+    const PARTNER_KEYS = ["Контрагент", "Партнер", "Партнёр", "Покупатель", "Поставщик", "Клиент", "Плательщик", "Грузополучатель", "Получатель"];
     const headers = src.map(o => {
       const number = readProp(o, ["Номер"]) || (o.ext ?? "").slice(0, 8);
       const dateRaw = readProp(o, ["Дата"]);
-      const partnerExt = readRef(o, ["Контрагент", "Партнер", "Партнёр", "Покупатель", "Поставщик"]);
-      const partnerId = partnerExt ? (partnersMap.get(partnerExt) ?? null) : null;
-      const total = Number(readNamed(o.num as any, ["СуммаДокумента", "Сумма"]) ?? o.num["СуммаДокумента"] ?? o.num["Сумма"] ?? 0) || 0;
-      const comment = readProp(o, ["Комментарий", "КомментарийДокумента", "Примечание"]);
-      return {
-        user_id: userId,
-        workspace_id: wsId,
-        ext_1c_id: o.ext,
-        number,
-        kind: g.kind,
-        doc_type: g.doc_type,
-        issue_date: parseDate1C(dateRaw),
+      let partnerId: string | null = null;
+      for (const k of PARTNER_KEYS) {
+        const ext = readRef(o, [k]);
+        const id = ext ? partnersMap.get(ext) : undefined;
+        if (id) { partnerId = id; break; }
+      }
+      if (!partnerId) {
+        // запасной путь: любая ссылка документа, которая есть в справочнике контрагентов
+        for (const v of Object.values(o.refs)) {
+          const id = partnersMap.get(normalizeExtId(v) || "");
+          if (id) { partnerId = id; break; }
+        }
+      }
+...
         partner_id: partnerId,
+        status_id: statusIds.get(o) ?? null,
         // Накладные приходят черновиками — склад двигается при проведении.
         status: g.doc_type === "order" && DOC_STATUSES.includes(readProp(o, ["СтатусCRM"]) ?? "") ? readProp(o, ["СтатусCRM"]) : "draft",
         warehouse_id: (() => { const w = readRef(o, ["Склад"]); return w ? (warehousesMap.get(w) ?? null) : null; })(),
