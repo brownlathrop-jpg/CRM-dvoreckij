@@ -16,6 +16,7 @@ import { lookupOrgByInn, lookupBankByBik } from "@/lib/dadata.functions";
 import { useActiveWorkspaceId, activeWorkspace } from "@/lib/workspace";
 import { WarehousesRef, ProductTypesRef, PriceTypesRef, CashflowItemsRef, BanksRef, DiscountsRef } from "@/components/settings-simple-refs";
 import { Import1CPanel } from "@/components/import-1c-panel";
+import { Export1CPanel } from "@/components/export-1c-panel";
 import { PriceImportPanel } from "@/components/price-import-panel";
 import { KktSettingsPanel } from "@/components/kkt-settings-panel";
 import { DataExportPanel } from "@/components/data-export-panel";
@@ -223,7 +224,8 @@ function SettingsPage() {
           <TabsTrigger value="org">Организация</TabsTrigger>
           <TabsTrigger value="refs">Справочники</TabsTrigger>
           <TabsTrigger value="kkt">Касса</TabsTrigger>
-          <TabsTrigger value="import">Обмен</TabsTrigger>
+          <TabsTrigger value="import">Импорт</TabsTrigger>
+          <TabsTrigger value="export">Экспорт</TabsTrigger>
           <TabsTrigger value="workspaces">Базы</TabsTrigger>
         </TabsList>
         </div>
@@ -608,24 +610,33 @@ function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="import" className="mt-3">
-          <Tabs defaultValue="prices">
+          <Tabs defaultValue={features.exchange1c ? "import1c" : "prices"}>
             <div className="overflow-x-auto">
               <TabsList className="h-8 w-max justify-start">
                 <TabsTrigger value="prices">Прайсы и остатки</TabsTrigger>
-                {features.exchange1c && <TabsTrigger value="onec">Импорт из 1С</TabsTrigger>}
-                {features.exchange1c && <TabsTrigger value="backup">Выгрузка данных</TabsTrigger>}
+                {features.exchange1c && <TabsTrigger value="import1c">Из 1С (XML)</TabsTrigger>}
               </TabsList>
             </div>
             <TabsContent value="prices" className="mt-3"><PriceImportPanel /></TabsContent>
-            {features.exchange1c ? (
-              <>
-                <TabsContent value="onec" className="mt-3"><Import1CPanel /></TabsContent>
-                <TabsContent value="backup" className="mt-3"><DataExportPanel /></TabsContent>
-              </>
-            ) : (
-              <div className="mt-3"><FeatureLock feature="exchange1c" /></div>
-            )}
+            {features.exchange1c && <TabsContent value="import1c" className="mt-3"><Import1CPanel /></TabsContent>}
           </Tabs>
+        </TabsContent>
+
+        <TabsContent value="export" className="mt-3">
+          {features.exchange1c ? (
+            <Tabs defaultValue="export1c">
+              <div className="overflow-x-auto">
+                <TabsList className="h-8 w-max justify-start">
+                  <TabsTrigger value="export1c">В 1С (XML)</TabsTrigger>
+                  <TabsTrigger value="exportData">Все данные (JSON)</TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="export1c" className="mt-3"><Export1CPanel /></TabsContent>
+              <TabsContent value="exportData" className="mt-3"><DataExportPanel /></TabsContent>
+            </Tabs>
+          ) : (
+            <div className="mt-3"><FeatureLock feature="exchange1c" /></div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
