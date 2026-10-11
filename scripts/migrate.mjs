@@ -10,7 +10,15 @@ import { sslOption } from "../selfhost/ssl-option.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dir = join(root, "sql", "migrations");
-const url = process.env.DATABASE_URL;
+let url = process.env.DATABASE_URL;
+if (!url) {
+  // Фолбэк: берём адрес базы из окружения запущенного процесса pm2 «crm»
+  try {
+    const { execSync } = await import("node:child_process");
+    const list = JSON.parse(execSync("pm2 jlist", { encoding: "utf8" }));
+    url = list.find((p) => p.name === "crm")?.pm2_env?.DATABASE_URL;
+  } catch {}
+}
 if (!url) {
   console.error("DATABASE_URL не задан");
   process.exit(1);

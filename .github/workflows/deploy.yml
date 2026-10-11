@@ -50,21 +50,18 @@ jobs:
             APP=/home/crmadmin/htdocs/crm.skladnow.ru
             cd "$APP"
             STAMP=$(date +%s)
-            cp -a dist "dist.prev-$STAMP"
+            mv dist "dist.prev-$STAMP"
             tar -xzf /tmp/deploy.tar.gz
             rm -f /tmp/deploy.tar.gz
-            chown -R crmdeploy:crmadmin dist scripts selfhost sql
-            set -a
-            . ./.env
-            set +a
+            if [ -r ./.env ]; then set -a; . ./.env; set +a; fi
             node scripts/migrate.mjs
-            sudo -u crmdeploy pm2 restart crm
+            pm2 restart ecosystem.config.cjs && pm2 save
             sleep 3
             if ! curl -sf -o /dev/null http://127.0.0.1:3001; then
               echo "Health check failed on :3001, rolling back"
               rm -rf dist
               mv "dist.prev-$STAMP" dist
-              sudo -u crmdeploy pm2 restart crm
+              pm2 restart ecosystem.config.cjs
               exit 1
             fi
             # Храним только 2 последние копии для отката
