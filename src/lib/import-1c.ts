@@ -422,6 +422,15 @@ function mergeObjectsByExt(src: Obj[]): Obj[] {
 const PARTNER_KINDS = ["customer", "supplier", "employee", "other"];
 const DOC_STATUSES = ["draft", "sent", "paid", "posted", "cancelled"];
 
+// Данные текущего импорта: справочник статусов 1С и организации.
+const statusNamesByExt = new Map<string, string>();
+const orgIdByExt = new Map<string, string>();
+let defaultOrgId: string | null = null;
+function resolveOrgId(o: Obj): string | null {
+  const ext = readRef(o, ["Организация", "Фирма", "ЮрЛицо"]);
+  return (ext && orgIdByExt.get(ext)) || defaultOrgId;
+}
+
 // Пользовательские статусы документов (справочник «Статусы документов»).
 type StatusResolver = (o: Obj) => Promise<string | null>;
 async function makeStatusResolver(wsId: string, userId: string): Promise<StatusResolver> {
@@ -444,7 +453,19 @@ async function makeStatusResolver(wsId: string, userId: string): Promise<StatusR
   const humanize = (s: string) => s.replace(/^.*\./, "").replace(/([а-яё])([А-ЯЁ])/g, "$1 $2").trim();
 
   return async (o: Obj) => {
-    const raw = readProp(o, ["СтатусЗаказа", "СостояниеЗаказа", "СтатусДокумента", "Статус", "Состояние", "СтатусCRM"]);
+    const STATUS_KEYS = ["СтатусЗаказа", "СостояниеЗаказа", "СтатусДокумента", "Статус", "Состояние", "СтатусCRM"];
+    let raw = readProp(o, STATUS_KEYS);
+    if (raw && hasUuidLike(raw)) {
+      const ext = normalizeExtId(raw);
+      raw = (ext && statusNamesByExt.get(ext)) || undefined;
+    }
+    if (!raw) {
+      // ссылка на справочник статусов под нестандартным именем
+      for (const v of Object.values(o.refs)) {
+        const n = statusNamesByExt.get(normalizeExtId(v) || "");
+        if (n) { raw = n; break; }
+      }
+    }
     if (raw && !hasUuidLike(raw) && !DOC_STATUSES.includes(raw)) {
       const name = humanize(raw);
       const low = name.toLowerCase();
@@ -488,6 +509,55 @@ export async function importAll(
   }
 
   const base = { user_id: userId, workspace_id: wsId };
+
+  // 0a. Справочники статусов/состояний: ext → название (для ссылок по UUID)
+  statusNamesByExt.clear();
+  for (const o of objs) {
+    if (!o.ext) continue;
+    if (!/(Статус|Состояни)/i.test(o.type)) continue;
+    const name = o.props["Наименование"] || o.props["Представление"] || o.props["Значение"] || o.props["Имя"];
+    if (name) statusNamesByExt.set(o.ext, name);
+  }
+
+  // 0b. Организации: создаём/обновляем по ИНН или названию, ext → id
+  orgIdByExt.clear();
+  {
+    const src = byType.get("СправочникСсылка.Организации") ?? [];
+    onProgress("Организации", 0, src.length);
+    const { data: existing } = await (db as any).from("organizations")
+      .select("id,name,inn,is_primary").eq("workspace_id", wsId);
+    const list = (existing ?? []) as { id: string; name: string; inn: string | null; is_primary: boolean }[];
+    let hasPrimary = list.some(x => x.is_primary);
+    let done = 0;
+    for (const o of src) {
+      const name = (readProp(o, ["Наименование"]) || "").trim();
+      if (!name) continue;
+      const inn = (readProp(o, ["ИНН"]) || "").trim() || null;
+      const payload: any = {
+        name,
+        full_name: readProp(o, ["НаименованиеПолное", "ПолноеНаименование"]) || null,
+        inn,
+        kpp: readProp(o, ["КПП"]) || null,
+        ogrn: readProp(o, ["ОГРН", "ОсновнойГосРегистрационныйНомер"]) || null,
+        okpo: readProp(o, ["КодПоОКПО", "ОКПО"]) || null,
+      };
+      for (const k of Object.keys(payload)) if (payload[k] === null) delete payload[k];
+      const found = list.find(x => (inn && x.inn === inn)) ?? list.find(x => x.name.trim().toLowerCase() === name.toLowerCase());
+      let id = found?.id;
+      if (found) {
+        await (db as any).from("organizations").update(payload).eq("id", found.id);
+      } else {
+        const { data, error } = await (db as any).from("organizations")
+          .insert({ ...base, ...payload, is_primary: !hasPrimary }).select("id").single();
+        if (error) throw new Error(`organizations: ${error.message}`);
+        id = data?.id; hasPrimary = true;
+        if (id) list.push({ id, name, inn, is_primary: false });
+      }
+      if (id && o.ext) orgIdByExt.set(o.ext, id);
+      onProgress("Организации", ++done, src.length);
+    }
+    defaultOrgId = list.find(x => x.is_primary)?.id ?? list[0]?.id ?? null;
+  }
 
   // 1. Склады
   {
