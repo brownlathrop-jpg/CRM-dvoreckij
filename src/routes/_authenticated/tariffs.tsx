@@ -78,6 +78,13 @@ function TariffsPage() {
         </p>
       </div>
 
+      {isAdmin && (
+        <p className="rounded border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
+          Вы суперадмин: кнопкой «Включить этот тариф» меняется тариф текущей базы. Тариф любого клиента —
+          в <Link to="/admin" className="underline">Админке → Клиенты и оплата</Link>.
+        </p>
+      )}
+
       {access && (
         <Card>
           <CardHeader className="pb-2">
@@ -156,6 +163,17 @@ function TariffsPage() {
                   {plan.limits.docsPerMonth ?? "без ограничения"} · Картинки:{" "}
                   {plan.limits.storageMb} МБ
                 </div>
+                {isAdmin && access && !current && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    disabled={saving !== null}
+                    onClick={() => switchPlan(p)}
+                  >
+                    {saving === p ? "Сохраняю…" : "Включить этот тариф"}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           );
