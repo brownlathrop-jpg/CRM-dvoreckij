@@ -422,6 +422,52 @@ function mergeObjectsByExt(src: Obj[]): Obj[] {
 const PARTNER_KINDS = ["customer", "supplier", "employee", "other"];
 const DOC_STATUSES = ["draft", "sent", "paid", "posted", "cancelled"];
 
+// Пользовательские статусы документов (справочник «Статусы документов»).
+type StatusResolver = (o: Obj) => Promise<string | null>;
+async function makeStatusResolver(wsId: string, userId: string): Promise<StatusResolver> {
+  const load = async () =>
+    ((await (db as any).from("invoice_statuses").select("id,name,sort_order").eq("workspace_id", wsId).order("sort_order")).data ?? []) as { id: string; name: string; sort_order: number }[];
+  let list = await load();
+  if (!list.length) {
+    await (db as any).from("invoice_statuses").insert([
+      { name: "Новый", color: "#64748b", sort_order: 0 },
+      { name: "Предоплата", color: "#eab308", sort_order: 1 },
+      { name: "Оплачен", color: "#3b82f6", sort_order: 2 },
+      { name: "Выполнен", color: "#22c55e", sort_order: 3 },
+    ].map(s => ({ ...s, user_id: userId, workspace_id: wsId })));
+    list = await load();
+  }
+  const byName = new Map(list.map(s => [s.name.trim().toLowerCase(), s.id]));
+  const find = (...names: string[]) => { for (const n of names) { const id = byName.get(n.toLowerCase()); if (id) return id; } return null; };
+  const def = list[0]?.id ?? null;
+  let nextSort = (list[list.length - 1]?.sort_order ?? 0) + 1;
+  const humanize = (s: string) => s.replace(/^.*\./, "").replace(/([а-яё])([А-ЯЁ])/g, "$1 $2").trim();
+
+  return async (o: Obj) => {
+    const raw = readProp(o, ["СтатусЗаказа", "СостояниеЗаказа", "СтатусДокумента", "Статус", "Состояние", "СтатусCRM"]);
+    if (raw && !hasUuidLike(raw) && !DOC_STATUSES.includes(raw)) {
+      const name = humanize(raw);
+      const low = name.toLowerCase();
+      let id = byName.get(low) ?? null;
+      if (!id) {
+        if (/закрыт|выполн|отгруж|завершен|исполн/.test(low)) id = find("Выполнен");
+        else if (/оплачен/.test(low)) id = find("Оплачен");
+        else if (/предоплат|к оплате|ожидает оплат/.test(low)) id = find("Предоплата");
+      }
+      if (!id && name) {
+        const { data } = await (db as any).from("invoice_statuses")
+          .insert({ name: name[0].toUpperCase() + name.slice(1), color: "#8b5cf6", sort_order: nextSort++, user_id: userId, workspace_id: wsId })
+          .select("id").single();
+        if (data?.id) { id = data.id; byName.set(low, data.id); }
+      }
+      if (id) return id;
+    }
+    if (readBool(o, ["Оплачен"])) return find("Оплачен") ?? def;
+    if (readBool(o, ["Закрыт", "Выполнен"])) return find("Выполнен") ?? def;
+    return def;
+  };
+}
+
 export async function importAll(
   xml: string,
   wsId: string,
@@ -1047,11 +1093,26 @@ async function importShipments(
     const warehousesMap = await loadExtMap("warehouses", wsId);
 
     // 1) Шапки: upsert по (user_id, ext_1c_id)
+    const resolveStatus = await makeStatusResolver(wsId, userId);
+    const statusIds = new Map<Obj, string | null>();
+    for (const o of src) statusIds.set(o, await resolveStatus(o));
+    const PARTNER_KEYS = ["Контрагент", "Партнер", "Партнёр", "Покупатель", "Поставщик", "Клиент", "Плательщик", "Грузополучатель", "Получатель"];
     const headers = src.map(o => {
       const number = readProp(o, ["Номер"]) || (o.ext ?? "").slice(0, 8);
       const dateRaw = readProp(o, ["Дата"]);
-      const partnerExt = readRef(o, ["Контрагент", "Партнер", "Партнёр", "Покупатель", "Поставщик"]);
-      const partnerId = partnerExt ? (partnersMap.get(partnerExt) ?? null) : null;
+      let partnerId: string | null = null;
+      for (const k of PARTNER_KEYS) {
+        const ext = readRef(o, [k]);
+        const id = ext ? partnersMap.get(ext) : undefined;
+        if (id) { partnerId = id; break; }
+      }
+      if (!partnerId) {
+        // запасной путь: любая ссылка документа, которая есть в справочнике контрагентов
+        for (const v of Object.values(o.refs)) {
+          const id = partnersMap.get(normalizeExtId(v) || "");
+          if (id) { partnerId = id; break; }
+        }
+      }
       const total = Number(readNamed(o.num as any, ["СуммаДокумента", "Сумма"]) ?? o.num["СуммаДокумента"] ?? o.num["Сумма"] ?? 0) || 0;
       const comment = readProp(o, ["Комментарий", "КомментарийДокумента", "Примечание"]);
       return {
@@ -1063,6 +1124,7 @@ async function importShipments(
         doc_type: g.doc_type,
         issue_date: parseDate1C(dateRaw),
         partner_id: partnerId,
+        status_id: statusIds.get(o) ?? null,
         // Накладные приходят черновиками — склад двигается при проведении.
         status: g.doc_type === "order" && DOC_STATUSES.includes(readProp(o, ["СтатусCRM"]) ?? "") ? readProp(o, ["СтатусCRM"]) : "draft",
         warehouse_id: (() => { const w = readRef(o, ["Склад"]); return w ? (warehousesMap.get(w) ?? null) : null; })(),
