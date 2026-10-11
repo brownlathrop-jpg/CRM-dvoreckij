@@ -1113,7 +1113,16 @@ async function importShipments(
           if (id) { partnerId = id; break; }
         }
       }
-...
+      const total = Number(readNamed(o.num as any, ["СуммаДокумента", "Сумма"]) ?? o.num["СуммаДокумента"] ?? o.num["Сумма"] ?? 0) || 0;
+      const comment = readProp(o, ["Комментарий", "КомментарийДокумента", "Примечание"]);
+      return {
+        user_id: userId,
+        workspace_id: wsId,
+        ext_1c_id: o.ext,
+        number,
+        kind: g.kind,
+        doc_type: g.doc_type,
+        issue_date: parseDate1C(dateRaw),
         partner_id: partnerId,
         status_id: statusIds.get(o) ?? null,
         // Накладные приходят черновиками — склад двигается при проведении.
