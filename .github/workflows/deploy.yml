@@ -67,4 +67,6 @@ jobs:
               sudo -u crmdeploy pm2 restart crm
               exit 1
             fi
+            # Храним только 2 последние копии для отката
+            ls -1dt dist.prev-* 2>/dev/null | tail -n +3 | xargs -r rm -rf
             echo "Deploy complete, health check OK on :3001"
