@@ -8,6 +8,8 @@ import { db } from "@/integrations/db";
 import { useActiveWorkspaceId } from "@/lib/workspace";
 import { importAll } from "@/lib/import-1c";
 import { importProductsCsv } from "@/lib/import-1c-csv";
+import { buildBaseExchangeXml, type ExportScope } from "@/lib/export-1c-full";
+import { downloadText } from "@/lib/export-1c";
 import { useQueryClient } from "@tanstack/react-query";
 
 export function Import1CPanel() {
@@ -88,6 +90,22 @@ export function Import1CPanel() {
     }
   };
 
+  const [exporting, setExporting] = useState<ExportScope | null>(null);
+  const onExport = async (scope: ExportScope) => {
+    if (!wsId) { toast.error("Не выбрана база данных"); return; }
+    setExporting(scope);
+    try {
+      const { xml, counts } = await buildBaseExchangeXml(wsId, scope);
+      const date = new Date().toISOString().slice(0, 10);
+      downloadText(scope === "products" ? `товары-и-услуги-${date}.xml` : `вся-база-1с-${date}.xml`, xml, "application/xml");
+      toast.success("Файл сохранён: " + Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(", "));
+    } catch (e: any) {
+      toast.error(e?.message ?? "Не удалось выгрузить");
+    } finally {
+      setExporting(null);
+    }
+  };
+
   const downloadDiag = () => {
     const diag = (window as any).__importDiag;
     const diagDocs = (window as any).__importDiagDocs;
@@ -112,8 +130,26 @@ export function Import1CPanel() {
         <p className="text-sm text-muted-foreground mt-1">
           Загрузите файл <code>export.xml</code> — выгрузку из 1С «Управление торговлей» (правила КонвертацииДанных 2.0).
           На этом шаге переносятся: <b>склады, виды номенклатуры, типы цен, статьи ДДС, банки, банковские счета, контрагенты, папки товаров и товары</b>.
-          Документы (реализация, поступление, ПКО/РКО) — будут отдельным шагом.
+          Также переносятся заявки, накладные, приходы и кассовые ордера.
         </p>
+      </div>
+
+      <div className="rounded-md border p-3 space-y-2">
+        <div className="text-sm font-medium">Выгрузка в формате 1С</div>
+        <p className="text-xs text-muted-foreground">
+          Файл можно загрузить сюда же в другой базе кнопкой «Выбрать файл XML». Накладные переносятся черновиками —
+          проведите их в новой базе, чтобы двинулся склад. Повторная загрузка того же файла не создаёт дублей.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" disabled={!!exporting || busy} onClick={() => onExport("products")}>
+            {exporting === "products" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+            Выгрузить товары и услуги
+          </Button>
+          <Button variant="outline" disabled={!!exporting || busy} onClick={() => onExport("all")}>
+            {exporting === "all" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+            Выгрузить всё: товары, контрагенты и документы
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
