@@ -195,14 +195,18 @@ function InvoiceView() {
   }, [fitLandscape]);
 
   /** Печать формы. facsimile=true — подставить печать и подписи организации. */
-  const doPrint = (mode: PrintMode, facsimile = false) => {
+  const doPrint = async (mode: PrintMode, facsimile = false) => {
     setPrintMode(mode);
     setWithFacsimile(facsimile);
+    // Ждём загрузку организаций, иначе шапка с реквизитами и строка
+    // «Поставщик» выпадают из печатной формы при быстрой печати.
+    if (!orgs.length) {
+      try { await orgsQuery.refetch(); } catch { /* печатаем как есть */ }
+    }
     setTimeout(() => {
       if (mode === "torg12" || mode === "upd") fitLandscape();
       window.print();
     }, 80);
-
   };
 
 
