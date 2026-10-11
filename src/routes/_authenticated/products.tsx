@@ -29,7 +29,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 export const Route = createFileRoute("/_authenticated/products")({
   head: () => ({ meta: [{ title: "Товары и услуги — КабинетCRM" }] }),
   component: ProductsPage,
-  errorComponent: ({ error }: { error: Error }) => (
+  errorComponent: ({ error }: { error: unknown }) => (
     <div className="p-6 space-y-2">
       <h1 className="text-lg font-semibold">Не удалось открыть список товаров</h1>
       <p className="text-sm text-muted-foreground">{error?.message ?? "Неизвестная ошибка"}</p>
