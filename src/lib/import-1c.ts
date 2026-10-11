@@ -419,6 +419,9 @@ function mergeObjectsByExt(src: Obj[]): Obj[] {
   return [...withoutExt, ...byExt.values()];
 }
 
+const PARTNER_KINDS = ["customer", "supplier", "employee", "other"];
+const DOC_STATUSES = ["draft", "sent", "paid", "posted", "cancelled"];
+
 export async function importAll(
   xml: string,
   wsId: string,
@@ -535,7 +538,10 @@ export async function importAll(
         okpo: o.props["КодПоОКПО"] || null,
         entity_type: o.props["ЮридическоеФизическоеЛицо"] === "ФизическоеЛицо" ? "individual" : "legal",
         is_group: isGroup,
-        kind: isCust ? "customer" : "supplier",
+        kind: PARTNER_KINDS.includes(o.props["ВидКонтрагента"]) ? o.props["ВидКонтрагента"] : isCust ? "customer" : "supplier",
+        phone: o.props["Телефон"] || null,
+        email: o.props["Email"] || null,
+        address: o.props["Адрес"] || null,
         comment: o.props["Комментарий"] || null,
       };
     });
@@ -832,7 +838,7 @@ export async function importAll(
         const ptExt = readRef(o, ["ВидНоменклатуры"]);
         const ptId = ptExt ? ptMap.get(ptExt) : null;
         const name = readProp(o, ["Наименование", "НаименованиеПолное"]) || "Товар";
-        const isService = /услуг/i.test(name);
+        const isService = readBool(o, ["ЭтоУслуга"]) || /услуг/i.test(name);
         const parentExt = readParentFolderExt(o);
         const pathExt = pathFolderExtByObject.get(o.ext!);
         const folderId = parentExt && fmap.has(parentExt)
@@ -846,7 +852,9 @@ export async function importAll(
           ...base, ext_1c_id: o.ext,
           name,
           unit: o.props["ЕдиницаХраненияОстатков"] || "шт",
-          price: 0, cost: 0,
+          sku: o.props["Артикул"] || null,
+          price: Number(o.num["Цена"] ?? 0) || 0,
+          cost: Number(o.num["ЗакупочнаяЦена"] ?? 0) || 0,
           kind: isService ? "service" : "product",
           is_service: isService,
           product_type_id: ptId,
@@ -1036,6 +1044,7 @@ async function importShipments(
       continue;
     }
     onProgress(g.label, 0, src.length);
+    const warehousesMap = await loadExtMap("warehouses", wsId);
 
     // 1) Шапки: upsert по (user_id, ext_1c_id)
     const headers = src.map(o => {
@@ -1054,7 +1063,9 @@ async function importShipments(
         doc_type: g.doc_type,
         issue_date: parseDate1C(dateRaw),
         partner_id: partnerId,
-        status: "draft",
+        // Накладные приходят черновиками — склад двигается при проведении.
+        status: g.doc_type === "order" && DOC_STATUSES.includes(readProp(o, ["СтатусCRM"]) ?? "") ? readProp(o, ["СтатусCRM"]) : "draft",
+        warehouse_id: (() => { const w = readRef(o, ["Склад"]); return w ? (warehousesMap.get(w) ?? null) : null; })(),
         total,
         note: comment || `Импорт из 1С: ${o.type}`,
       };
@@ -1180,7 +1191,7 @@ async function importCashDocs(
         doc_type: "cash_receipt",
         issue_date: parseDate1C(dateRaw),
         partner_id: partnerId,
-        status: "draft",
+        status: DOC_STATUSES.includes(readProp(o, ["СтатусCRM"]) ?? "") ? readProp(o, ["СтатусCRM"]) : "draft",
         total,
         cash_received: total,
         note: comment || `Импорт из 1С: ${o.type}`,
