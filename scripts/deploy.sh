@@ -22,7 +22,7 @@ bun run build
 [ -f dist/server/index.mjs ] || { echo "Сборка не создала dist/server/index.mjs"; exit 1; }
 
 echo ">>> [2/5] Заливка в $SSH_USER@$SSH_HOST:$REMOTE_DIR..."
-tar -cz dist selfhost sql scripts | run "cd '$REMOTE_DIR' && rm -rf dist.old && { [ -d dist ] && mv dist dist.old; }; rm -rf selfhost sql scripts; tar -xz"
+tar -cz dist selfhost sql scripts | run "cd '$REMOTE_DIR' && { [ -d dist ] && mv dist dist.prev-\$(date +%s); }; rm -rf selfhost sql scripts; tar -xz; ls -1dt dist.prev-* 2>/dev/null | tail -n +3 | xargs -r rm -rf"
 
 echo ">>> [3/5] Миграции базы..."
 run "cd '$REMOTE_DIR' && set -a && . ./.env && set +a && node scripts/migrate.mjs"
