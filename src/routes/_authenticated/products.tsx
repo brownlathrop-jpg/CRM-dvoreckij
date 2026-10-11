@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authenticated/products")({
   errorComponent: ({ error }: { error: unknown }) => (
     <div className="p-6 space-y-2">
       <h1 className="text-lg font-semibold">Не удалось открыть список товаров</h1>
-      <p className="text-sm text-muted-foreground">{error?.message ?? "Неизвестная ошибка"}</p>
+      <p className="text-sm text-muted-foreground">{error instanceof Error ? error.message : "Неизвестная ошибка"}</p>
       <Button onClick={() => window.location.reload()}>Обновить</Button>
     </div>
   ),
