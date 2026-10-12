@@ -30,6 +30,8 @@ import { usePriceTypes, useMyPriceTypeId, priceOf } from "@/lib/price-types";
 import { useOrganizations, pickOrg } from "@/lib/organizations";
 import { Torg12 } from "@/components/print/Torg12";
 import { Upd } from "@/components/print/Upd";
+import { useServerFn } from "@tanstack/react-start";
+import { lookupOrgByInn } from "@/lib/dadata.functions";
 import type { PrintItem } from "@/components/print/print-types";
 import { PrintHeader } from "@/components/print/PrintHeader";
 import { PaymentQr } from "@/components/print/PaymentQr";
@@ -84,12 +86,54 @@ function InvoiceView() {
     queryFn: async () => {
       const { data, error } = await db
         .from("invoices")
-        .select("*, partner:partners(name,inn,phone,address), items:invoice_items(*)")
+        .select("*, partner:partners(*), items:invoice_items(*)")
         .eq("id", id).single();
       if (error) throw error;
       return data as any;
     },
   });
+
+  // Банковские реквизиты контрагента для печатных форм
+  const printPartnerId = inv?.partner_id as string | undefined;
+  const { data: partnerBank } = useQuery({
+    queryKey: ["partner-bank-print", printPartnerId],
+    enabled: !!printPartnerId,
+    queryFn: async () => {
+      const { data: acc } = await (db as any).from("bank_accounts")
+        .select("bank_id,account_number,is_primary").eq("partner_id", printPartnerId)
+        .order("is_primary", { ascending: false }).limit(1).maybeSingle();
+      if (!acc) return null;
+      let bank: any = null;
+      if (acc.bank_id) bank = (await (db as any).from("banks").select("*").eq("id", acc.bank_id).maybeSingle()).data;
+      return {
+        bank_account: acc.account_number as string,
+        bank_name: bank?.name ?? null,
+        bank_bik: bank?.bik ?? null,
+        bank_corr_account: bank?.corr_account ?? bank?.correspondent_account ?? null,
+      };
+    },
+  });
+  // Если у контрагента не заполнен адрес/КПП — подтягиваем по ИНН и сохраняем в карточку
+  const lookupOrgFn = useServerFn(lookupOrgByInn);
+  const qcPartner = useQueryClient();
+  const triedInn = useRef<string | null>(null);
+  useEffect(() => {
+    const p = inv?.partner;
+    if (!p || !printPartnerId || !p.inn || triedInn.current === p.inn) return;
+    if (p.address && (p.kpp || String(p.inn).length === 12)) return;
+    triedInn.current = p.inn;
+    lookupOrgFn({ data: { inn: String(p.inn) } }).then(async (r: any) => {
+      if (!r) return;
+      const patch: any = {};
+      if (!p.address && r.legal_address) patch.address = r.legal_address;
+      if (!p.kpp && r.kpp) patch.kpp = r.kpp;
+      if (!p.okpo && r.okpo) patch.okpo = r.okpo;
+      if (!p.full_name && r.full_name) patch.full_name = r.full_name;
+      if (!Object.keys(patch).length) return;
+      await (db as any).from("partners").update(patch).eq("id", printPartnerId);
+      qcPartner.invalidateQueries({ queryKey: ["invoice", id] });
+    }).catch(() => {});
+  }, [inv?.partner, printPartnerId]);
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", wsId],
@@ -575,13 +619,14 @@ function InvoiceView() {
   }
   if (isLoading || !inv) return <div className="text-muted-foreground">Загрузка…</div>;
 
-  const partnerObj = inv.partner;
+  const partnerObj = inv.partner ? { ...inv.partner, ...(partnerBank ?? {}) } : null;
   const orgAsParty = myOrg ? {
     name: myOrg.name,
     inn: myOrg.inn,
     kpp: myOrg.kpp,
     phone: myOrg.phone,
     address: myOrg.legal_address,
+    okpo: myOrg.okpo,
     bank_name: myOrg.bank_name,
     bank_bik: myOrg.bank_bik,
     bank_account: myOrg.bank_account,
