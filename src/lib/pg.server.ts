@@ -590,7 +590,11 @@ export async function runQuery(
     }
 
     if (spec.mode === "update") {
-      await assertWrite(await affectedWorkspaces(s, table, spec.filters ?? [], scope));
+      {
+        const affected = await affectedWorkspaces(s, table, spec.filters ?? [], scope);
+        if (!affected.length) return { data: spec.single ? null : [], error: null };
+        await assertWrite(affected);
+      }
       const patch = { ...(spec.payload?.[0] ?? {}), updated_at: new Date().toISOString() };
       delete (patch as Row).id;
       const buf = new SqlBuf();
@@ -609,7 +613,12 @@ export async function runQuery(
     }
 
     // delete
-    await assertWrite(await affectedWorkspaces(s, table, spec.filters ?? [], scope));
+    {
+      // Нечего удалять — это не ошибка (например, у нового документа ещё нет движений).
+      const affected = await affectedWorkspaces(s, table, spec.filters ?? [], scope);
+      if (!affected.length) return { data: [], error: null };
+      await assertWrite(affected);
+    }
     // Товары с движениями/документами пропускаем, остальные удаляем.
     let skipIds: string[] = [];
     if (table === "products") skipIds = await usedProductIds(s, spec.filters ?? [], scope);

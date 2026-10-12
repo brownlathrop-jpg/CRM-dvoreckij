@@ -14,11 +14,13 @@ export async function applyShipmentStock(invoiceId: string): Promise<void> {
   if (!inv) return;
 
   // Старые движения этого документа всегда убираем.
-  const { error: delErr } = await db
+  let delQ: any = db
     .from("stock_movements")
     .delete()
     .eq("doc_type", "shipment")
     .eq("doc_id", invoiceId);
+  if (inv.workspace_id) delQ = delQ.eq("workspace_id", inv.workspace_id);
+  const { error: delErr } = await delQ;
   if (delErr) throw new Error(delErr.message);
 
   const { data: items } = await db
