@@ -67,9 +67,9 @@ export async function saveInvoice(opts: {
       [opts.invoiceId, keep] as any,
     );
 
-    for (const it of opts.items) {
+    for (const [pos, it] of opts.items.entries()) {
       const id = it.id || crypto.randomUUID();
-      const data = { ...it, id, invoice_id: opts.invoiceId };
+      const data = { ...it, id, invoice_id: opts.invoiceId, position: pos + 1 };
       await t.unsafe(
         `insert into invoice_items (id, workspace_id, user_id, data)
          values ($1, $2, $3, $4::jsonb)
@@ -116,11 +116,11 @@ export async function createInvoice(opts: {
       `insert into invoices (id, workspace_id, user_id, data) values ($1, $2, $3, $4::jsonb)`,
       [id, opts.workspaceId, opts.userId, data] as any,
     );
-    for (const it of opts.items) {
+    for (const [pos, it] of opts.items.entries()) {
       const itemId = it.id || crypto.randomUUID();
       await t.unsafe(
         `insert into invoice_items (id, workspace_id, user_id, data) values ($1, $2, $3, $4::jsonb)`,
-        [itemId, opts.workspaceId, opts.userId, { ...it, id: itemId, invoice_id: id }] as any,
+        [itemId, opts.workspaceId, opts.userId, { ...it, id: itemId, invoice_id: id, position: pos + 1 }] as any,
       );
     }
     await t.unsafe(

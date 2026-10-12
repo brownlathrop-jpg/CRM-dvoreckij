@@ -116,8 +116,8 @@ function NewShipment() {
       }).select("id").single();
       if (error) throw error;
 
-      const rows = items.map(it => ({
-        invoice_id: inv.id,
+      const rows = items.map((it, pos) => ({
+        invoice_id: inv.id, position: pos + 1,
         product_id: it.product_id,
         name: it.name,
         quantity: it.quantity,

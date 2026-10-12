@@ -271,7 +271,7 @@ function InvoiceView() {
     const mode = inv.vat_mode as VatMode | undefined;
     setVatFromDoc(Boolean(mode));
     if (mode) setVatMode(mode);
-    setItems((inv.items ?? []).map((it: any) => ({
+    setItems(sortItems(inv.items ?? []).map((it: any) => ({
       id: it.id, product_id: it.product_id, name: it.name,
       quantity: Number(it.quantity), price: Number(it.price),
       kind: (it.kind ?? "product") as "product" | "service",
@@ -470,7 +470,8 @@ function InvoiceView() {
       }).select().single();
       if (error) throw error;
       // Copy items
-      const rows = items.map(it => ({
+      const rows = items.map((it, pos) => ({
+        position: pos + 1,
         invoice_id: ship.id, workspace_id: inv!.workspace_id ?? wsId, product_id: it.product_id, name: it.name,
         quantity: it.quantity, price: it.price, sum: it.quantity * it.price,
         kind: it.kind ?? "product",
@@ -575,7 +576,8 @@ function InvoiceView() {
         organization_id: inv!.organization_id ?? null,
       }).select("id").single();
       if (error) throw error;
-      const rows = items.map(it => ({
+      const rows = items.map((it, pos) => ({
+        position: pos + 1,
         invoice_id: doc.id, workspace_id: inv!.workspace_id ?? wsId, product_id: it.product_id, name: it.name,
         quantity: it.quantity, price: it.price,
         sum: netSum(it.quantity, it.price, it.discount_kind, it.discount_value),
