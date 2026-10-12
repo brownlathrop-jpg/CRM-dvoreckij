@@ -477,7 +477,12 @@ function InvoiceView() {
       const rows = items.map((it, pos) => ({
         position: pos + 1,
         invoice_id: ship.id, workspace_id: inv!.workspace_id ?? wsId, product_id: it.product_id, name: it.name,
-        quantity: it.quantity, price: it.price, sum: it.quantity * it.price,
+        quantity: it.quantity, price: it.price,
+        sum: netSum(it.quantity, it.price, it.discount_kind, it.discount_value),
+        discount_kind: it.discount_kind ?? null,
+        discount_value: Number(it.discount_value) || 0,
+        discount_name: it.discount_name ?? null,
+        vat_rate: it.vat_rate ?? null,
         kind: it.kind ?? "product",
       }));
       if (rows.length) {
