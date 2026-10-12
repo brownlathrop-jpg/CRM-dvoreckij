@@ -94,13 +94,13 @@ function InvoiceView() {
   });
 
   // Банковские реквизиты контрагента для печатных форм
-  const partnerId = inv?.partner_id as string | undefined;
+  const printPartnerId = inv?.partner_id as string | undefined;
   const { data: partnerBank } = useQuery({
-    queryKey: ["partner-bank-print", partnerId],
-    enabled: !!partnerId,
+    queryKey: ["partner-bank-print", printPartnerId],
+    enabled: !!printPartnerId,
     queryFn: async () => {
       const { data: acc } = await (db as any).from("bank_accounts")
-        .select("bank_id,account_number,is_primary").eq("partner_id", partnerId)
+        .select("bank_id,account_number,is_primary").eq("partner_id", printPartnerId)
         .order("is_primary", { ascending: false }).limit(1).maybeSingle();
       if (!acc) return null;
       let bank: any = null;
@@ -119,7 +119,7 @@ function InvoiceView() {
   const triedInn = useRef<string | null>(null);
   useEffect(() => {
     const p = inv?.partner;
-    if (!p || !partnerId || !p.inn || triedInn.current === p.inn) return;
+    if (!p || !printPartnerId || !p.inn || triedInn.current === p.inn) return;
     if (p.address && (p.kpp || String(p.inn).length === 12)) return;
     triedInn.current = p.inn;
     lookupOrgFn({ data: { inn: String(p.inn) } }).then(async (r: any) => {
@@ -130,10 +130,10 @@ function InvoiceView() {
       if (!p.okpo && r.okpo) patch.okpo = r.okpo;
       if (!p.full_name && r.full_name) patch.full_name = r.full_name;
       if (!Object.keys(patch).length) return;
-      await (db as any).from("partners").update(patch).eq("id", partnerId);
+      await (db as any).from("partners").update(patch).eq("id", printPartnerId);
       qcPartner.invalidateQueries({ queryKey: ["invoice", id] });
     }).catch(() => {});
-  }, [inv?.partner, partnerId]);
+  }, [inv?.partner, printPartnerId]);
 
   const { data: products = [] } = useQuery({
     queryKey: ["products", wsId],
