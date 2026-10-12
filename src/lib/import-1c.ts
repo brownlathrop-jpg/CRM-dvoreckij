@@ -1241,9 +1241,9 @@ async function importShipments(
       const invId = o.ext ? idByExt.get(o.ext) : undefined;
       if (!invId) continue;
       const rows = docItemRows(o, productsMap, productNameById);
-      for (const r of rows) {
+      for (const [pos, r] of rows.entries()) {
         if (r.product_id) withProduct += 1;
-        itemsBuf.push({ invoice_id: invId, workspace_id: wsId, ...r });
+        itemsBuf.push({ invoice_id: invId, workspace_id: wsId, ...r, position: pos + 1 });
       }
     }
     for (let i = 0; i < itemsBuf.length; i += 500) {

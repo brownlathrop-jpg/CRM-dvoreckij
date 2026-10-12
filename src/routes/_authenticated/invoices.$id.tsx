@@ -39,6 +39,8 @@ import { SignLine } from "@/components/print/SignLine";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useDiscounts, grossSum, discountSum, netSum, discountLabel, type DiscountKind } from "@/lib/discounts";
 import { DocTreeCard, loadChain } from "@/components/DocTreeCard";
+import { sortItems, moveItem } from "@/lib/item-order";
+import { GripVertical } from "lucide-react";
 import { docTitle as docTitleOf, docTitleAccusative, effectiveCashKind } from "@/lib/doc-tree";
 import {
   VAT_MODES, VAT_RATES, splitVat, sumVat, toVatRate, vatRateId, defaultVatMode, defaultVatRate,
@@ -183,6 +185,8 @@ function InvoiceView() {
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [note, setNote] = useState("");
   const [items, setItems] = useState<Item[]>([]);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
   const [pickRow, setPickRow] = useState<number | null>(null);
   const [printMode, setPrintMode] = useState<PrintMode>("standard");
   /** Печатать счёт с факсимиле подписей и печатью организации. */
@@ -271,7 +275,7 @@ function InvoiceView() {
     const mode = inv.vat_mode as VatMode | undefined;
     setVatFromDoc(Boolean(mode));
     if (mode) setVatMode(mode);
-    setItems((inv.items ?? []).map((it: any) => ({
+    setItems(sortItems(inv.items ?? []).map((it: any) => ({
       id: it.id, product_id: it.product_id, name: it.name,
       quantity: Number(it.quantity), price: Number(it.price),
       kind: (it.kind ?? "product") as "product" | "service",
@@ -470,7 +474,8 @@ function InvoiceView() {
       }).select().single();
       if (error) throw error;
       // Copy items
-      const rows = items.map(it => ({
+      const rows = items.map((it, pos) => ({
+        position: pos + 1,
         invoice_id: ship.id, workspace_id: inv!.workspace_id ?? wsId, product_id: it.product_id, name: it.name,
         quantity: it.quantity, price: it.price, sum: it.quantity * it.price,
         kind: it.kind ?? "product",
@@ -575,7 +580,8 @@ function InvoiceView() {
         organization_id: inv!.organization_id ?? null,
       }).select("id").single();
       if (error) throw error;
-      const rows = items.map(it => ({
+      const rows = items.map((it, pos) => ({
+        position: pos + 1,
         invoice_id: doc.id, workspace_id: inv!.workspace_id ?? wsId, product_id: it.product_id, name: it.name,
         quantity: it.quantity, price: it.price,
         sum: netSum(it.quantity, it.price, it.discount_kind, it.discount_value),
@@ -998,7 +1004,7 @@ function InvoiceView() {
               <TableHeader>
                 <TableRow>
                   {editable && (
-                    <TableHead className="w-8">
+                    <TableHead className="w-14">
                       <Checkbox
                         checked={items.length > 0 && selected.length === items.length}
                         onCheckedChange={(v) => setSelected(v ? items.map((_, i) => i) : [])}
@@ -1034,10 +1040,22 @@ function InvoiceView() {
                   </TableRow>
                 )}
                 {items.map((it, idx) => (
-                  <TableRow key={idx} data-selected={selected.includes(idx) || undefined} className={selected.includes(idx) ? "bg-accent/40" : undefined}>
+                  <TableRow key={it.id ?? `n${idx}`} data-selected={selected.includes(idx) || undefined}
+                    className={[selected.includes(idx) ? "bg-accent/40" : "", dragIdx === idx ? "opacity-40" : "", overIdx === idx && dragIdx !== null && dragIdx !== idx ? (dragIdx < idx ? "border-b-2 border-b-primary" : "border-t-2 border-t-primary") : ""].join(" ")}
+                    onDragOver={editable ? (e) => { if (dragIdx === null) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (overIdx !== idx) setOverIdx(idx); } : undefined}
+                    onDrop={editable ? (e) => { e.preventDefault(); if (dragIdx !== null) { setItems(moveItem(items, dragIdx, idx)); setSelected([]); } setDragIdx(null); setOverIdx(null); } : undefined}>
                     {editable && (
                       <TableCell>
+                        <div className="flex items-center gap-1">
+                        <span
+                          draggable
+                          title="Перетащите, чтобы изменить порядок"
+                          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+                          onDragStart={(e) => { setDragIdx(idx); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(idx)); const tr = (e.currentTarget as HTMLElement).closest("tr"); if (tr) e.dataTransfer.setDragImage(tr, 10, 10); }}
+                          onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
+                        ><GripVertical className="h-4 w-4" /></span>
                         <Checkbox checked={selected.includes(idx)} onCheckedChange={() => toggleSel(idx)} aria-label="Отметить позицию" />
+                        </div>
                       </TableCell>
                     )}
                     <TableCell>
