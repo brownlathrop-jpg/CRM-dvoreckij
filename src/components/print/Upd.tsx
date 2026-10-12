@@ -61,9 +61,10 @@ export function Upd({
         <Row label="Продавец" value={nm(supplier)} code="2" />
         <Row label="Адрес" value={supplier?.address || "—"} code="2а" />
         <Row label="ИНН/КПП продавца" value={innKpp(supplier)} code="2б" />
-        <Row label="Грузоотправитель и его адрес" value="он же" code="3" />
-        <Row label="Грузополучатель и его адрес" value="он же" code="4" />
+        <Row label="Грузоотправитель и его адрес" value={[nm(supplier), supplier?.address].filter(Boolean).join(", ")} code="3" />
+        <Row label="Грузополучатель и его адрес" value={[nm(buyer), buyer?.address].filter(Boolean).join(", ")} code="4" />
         <Row label="К платёжно-расчётному документу" value="—" code="5" />
+        <Row label="Документ об отгрузке" value={`№ п/п 1–${items.length} № ${number} от ${dfmt.format(d)}`} code="5а" />
         <Row label="Покупатель" value={nm(buyer)} code="6" />
         <Row label="Адрес" value={buyer?.address || "—"} code="6а" />
         <Row label="ИНН/КПП покупателя" value={innKpp(buyer)} code="6б" />

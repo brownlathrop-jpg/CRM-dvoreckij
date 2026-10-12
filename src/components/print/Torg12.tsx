@@ -1,11 +1,25 @@
 import { amountInWords } from "@/lib/amount-in-words";
-import { type PrintItem, type PrintParty, dfmt, nfmt } from "./print-types";
+import { type PrintItem, type PrintParty, partyFull, dfmt, nfmt } from "./print-types";
 
 /**
  * Товарная накладная по унифицированной форме № ТОРГ-12 (ОКУД 0330212),
  * утверждённой постановлением Госкомстата России от 25.12.1998 № 132.
  * Структура строк и 15 граф таблицы соответствуют бланку.
  */
+const W = ["ноль","один","два","три","четыре","пять","шесть","семь","восемь","девять","десять","одиннадцать","двенадцать","тринадцать","четырнадцать","пятнадцать","шестнадцать","семнадцать","восемнадцать","девятнадцать"];
+const T = ["","","двадцать","тридцать","сорок","пятьдесят","шестьдесят","семьдесят","восемьдесят","девяносто"];
+const H = ["","сто","двести","триста","четыреста","пятьсот","шестьсот","семьсот","восемьсот","девятьсот"];
+function countWords(n: number): string {
+  if (n < 20) return W[n];
+  if (n >= 1000) return String(n);
+  const out: string[] = [];
+  if (n >= 100) out.push(H[Math.floor(n / 100)]);
+  const r = n % 100;
+  if (r >= 20) { out.push(T[Math.floor(r / 10)]); if (r % 10) out.push(W[r % 10]); }
+  else if (r) out.push(W[r]);
+  return out.join(" ");
+}
+
 export function Torg12({
   supplier, buyer, number, date, items, note,
 }: {
@@ -27,7 +41,7 @@ export function Torg12({
   const qtyTotal = items.reduce((s, i) => s + i.quantity, 0);
   const b = "border border-black px-1 py-0.5 align-top";
   const d = new Date(date);
-  const party = (p: PrintParty) => p?.name || "—";
+  const party = (p: PrintParty) => partyFull(p);
   const fill = "border-b border-black inline-block min-w-[60%] align-bottom";
   const rub = Math.floor(total);
   const kop = Math.round((total - rub) * 100);
@@ -66,7 +80,10 @@ export function Torg12({
           <table className="w-full border-collapse">
             <tbody>
               <tr><td className={b}>Форма по ОКУД</td><td className={`${b} text-center`}>0330212</td></tr>
-              <tr><td className={b}>по ОКПО</td><td className={b} /></tr>
+              <tr><td className={b}>по ОКПО (грузоотправитель)</td><td className={`${b} text-center`}>{supplier?.okpo || ""}</td></tr>
+              <tr><td className={b}>по ОКПО (грузополучатель)</td><td className={`${b} text-center`}>{buyer?.okpo || ""}</td></tr>
+              <tr><td className={b}>по ОКПО (поставщик)</td><td className={`${b} text-center`}>{supplier?.okpo || ""}</td></tr>
+              <tr><td className={b}>по ОКПО (плательщик)</td><td className={`${b} text-center`}>{buyer?.okpo || ""}</td></tr>
               <tr><td className={b}>Вид деятельности по ОКДП</td><td className={b} /></tr>
               <tr><td className={b}>Основание: номер</td><td className={b} /></tr>
               <tr><td className={b}>дата</td><td className={b} /></tr>
@@ -175,7 +192,7 @@ export function Torg12({
         <div>Товарная накладная имеет приложение на <span className="border-b border-black inline-block w-32" /> листах
           <span className="text-[8px]"> (прописью)</span>
         </div>
-        <div>и содержит <span className="border-b border-black inline-block w-32 text-center">{items.length}</span> номеров записей
+        <div>и содержит <span className="border-b border-black inline-block w-32 text-center">{countWords(items.length)}</span> порядковых номеров записей
           <span className="text-[8px]"> (прописью)</span>
         </div>
         <div>Масса груза (нетто) <span className="border-b border-black inline-block w-40" /></div>

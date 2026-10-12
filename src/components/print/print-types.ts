@@ -4,6 +4,7 @@ export type PrintParty = {
   kpp?: string | null;
   address?: string | null;
   phone?: string | null;
+  okpo?: string | null;
   bank_name?: string | null;
   bank_bik?: string | null;
   bank_account?: string | null;
@@ -29,6 +30,22 @@ export type PrintItem = {
 
 export const nfmt = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const dfmt = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+/** Полная строка реквизитов для ТОРГ-12: наименование, ИНН/КПП, адрес, телефон, банк. */
+export function partyFull(p: PrintParty): string {
+  if (!p) return "—";
+  return [
+    p.name,
+    p.inn ? `ИНН ${p.inn}` : "",
+    p.kpp ? `КПП ${p.kpp}` : "",
+    p.address,
+    p.phone ? `тел. ${p.phone}` : "",
+    p.bank_account ? `р/с ${p.bank_account}` : "",
+    p.bank_name ? `в ${p.bank_name}` : "",
+    p.bank_bik ? `БИК ${p.bank_bik}` : "",
+    p.bank_corr_account ? `к/с ${p.bank_corr_account}` : "",
+  ].filter(Boolean).join(", ");
+}
 
 export function partyLine(p: PrintParty): string {
   if (!p) return "—";
